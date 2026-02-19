@@ -1,2 +1,2 @@
-# clef-hanger
-Clef Hanger is an interactive browser-based music theory game that challenges players to identify musical notes on a staff. It presents notes visually on treble or bass clefs and tests the user's ability to name them correctly, making it a fun and educational tool for beginner musicians learning to read sheet music.
+# Note Ninja
+Note Ninja is a fast-paced music theory game that trains your eyes and reflexes to identify notes on a musical staff. Like a true ninja, you must be quick, sharp, and precise — spot the note and strike before time runs out. Perfect for beginner musicians looking to master note reading in a fun and engaging way.
