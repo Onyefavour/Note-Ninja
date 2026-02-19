@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clef Hanger</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --neon-gold: #FFD700; --neon-cyan: #00FFFF; --neon-pink: #FF006E;
+    --neon-green: #39FF14; --neon-purple: #BF00FF; --dark-bg: #05050F;
+    --panel-bg: rgba(10,10,30,0.95);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--dark-bg); color:#fff; font-family:'Rajdhani',sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; overflow:hidden; }
+  body::before { content:''; position:fixed; inset:0; background: radial-gradient(ellipse at 20% 50%,rgba(0,255,255,0.04) 0%,transparent 50%), radial-gradient(ellipse at 80% 20%,rgba(255,0,110,0.04) 0%,transparent 50%); pointer-events:none; z-index:0; }
+  #game-wrapper { position:relative; width:900px; max-width:100vw; z-index:1; }
+
+  .screen { display:none; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:20px; text-align:center; }
+  .screen.active { display:flex; }
+
+  #title-logo { font-family:'Orbitron',monospace; font-weight:900; font-size:clamp(3rem,8vw,6rem); letter-spacing:0.05em; background:linear-gradient(135deg,var(--neon-gold) 0%,var(--neon-cyan) 50%,var(--neon-pink) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; filter:drop-shadow(0 0 30px rgba(255,215,0,0.5)); animation:logoFloat 3s ease-in-out infinite; line-height:1.1; }
+  @keyframes logoFloat { 0%,100%{transform:translateY(0);filter:drop-shadow(0 0 30px rgba(255,215,0,0.5));} 50%{transform:translateY(-10px);filter:drop-shadow(0 0 50px rgba(0,255,255,0.7));} }
+  .treble-clef { font-size:clamp(4rem,10vw,8rem); line-height:1; animation:spin3d 8s linear infinite; display:block; margin-bottom:10px; filter:drop-shadow(0 0 20px var(--neon-cyan)); }
+  @keyframes spin3d { 0%{transform:rotateY(0deg);} 50%{transform:rotateY(180deg);opacity:0.6;} 51%{transform:rotateY(180deg);opacity:0.6;} 100%{transform:rotateY(360deg);} }
+  .tagline { font-size:1.2rem; color:rgba(255,255,255,0.6); letter-spacing:0.3em; text-transform:uppercase; margin:15px 0 30px; }
+  .staff-lines { width:100%; max-width:500px; height:40px; position:relative; margin:10px auto; overflow:hidden; }
+  .staff-lines::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(to bottom,transparent 0px,transparent 5px,rgba(255,215,0,0.3) 5px,rgba(255,215,0,0.3) 6px,transparent 6px,transparent 13px); }
+  .staff-note { position:absolute; font-size:1.5rem; color:var(--neon-gold); top:-5px; animation:noteSlide 3s linear infinite; text-shadow:0 0 10px var(--neon-gold); }
+  .staff-note:nth-child(1){animation-delay:0s;left:-30px;} .staff-note:nth-child(2){animation-delay:1s;left:-30px;top:8px;} .staff-note:nth-child(3){animation-delay:2s;left:-30px;top:18px;}
+  @keyframes noteSlide { from{transform:translateX(0);opacity:1;} to{transform:translateX(550px);opacity:0;} }
+
+  .btn-primary { font-family:'Orbitron',monospace; font-size:0.95rem; font-weight:700; letter-spacing:0.15em; text-transform:uppercase; padding:14px 44px; background:transparent; color:var(--neon-gold); border:2px solid var(--neon-gold); cursor:pointer; position:relative; overflow:hidden; transition:all 0.3s; clip-path:polygon(10px 0%,100% 0%,calc(100% - 10px) 100%,0% 100%); margin:8px; }
+  .btn-primary::before { content:''; position:absolute; inset:0; background:var(--neon-gold); transform:translateX(-105%); transition:transform 0.3s; z-index:-1; }
+  .btn-primary:hover{color:var(--dark-bg);box-shadow:0 0 30px var(--neon-gold);} .btn-primary:hover::before{transform:translateX(0);}
+  .btn-cyan{color:var(--neon-cyan);border-color:var(--neon-cyan);} .btn-cyan::before{background:var(--neon-cyan);} .btn-cyan:hover{color:var(--dark-bg);box-shadow:0 0 30px var(--neon-cyan);}
+  .btn-pink{color:var(--neon-pink);border-color:var(--neon-pink);} .btn-pink::before{background:var(--neon-pink);} .btn-pink:hover{color:#fff;box-shadow:0 0 30px var(--neon-pink);}
+
+  .diff-cards { display:flex; gap:20px; flex-wrap:wrap; justify-content:center; margin:24px 0; }
+  .diff-card { background:var(--panel-bg); border:1px solid rgba(255,255,255,0.1); padding:22px 28px; cursor:pointer; transition:all 0.3s; position:relative; min-width:150px; }
+  .diff-card:hover,.diff-card.selected{border-color:var(--neon-cyan);box-shadow:0 0 20px rgba(0,255,255,0.3);transform:translateY(-3px);}
+  .diff-card.selected::after{content:'✓';position:absolute;top:8px;right:12px;color:var(--neon-green);font-size:1rem;}
+  .diff-name{font-family:'Orbitron',monospace;font-size:0.85rem;font-weight:700;letter-spacing:0.1em;margin-bottom:8px;}
+  .diff-time{font-size:2rem;font-weight:600;color:var(--neon-gold);}
+  .diff-desc{font-size:0.78rem;color:rgba(255,255,255,0.5);margin-top:5px;}
+  .screen-title{font-family:'Orbitron',monospace;font-size:clamp(1.4rem,4vw,2.3rem);font-weight:700;letter-spacing:0.1em;margin-bottom:12px;color:var(--neon-cyan);}
+
+  /* LEADERBOARD */
+  .lb-table{width:100%;max-width:520px;border-collapse:collapse;margin:16px auto;}
+  .lb-table th{font-family:'Orbitron',monospace;font-size:0.6rem;letter-spacing:0.2em;color:rgba(255,255,255,0.4);padding:8px 10px;border-bottom:1px solid rgba(255,215,0,0.2);text-align:left;}
+  .lb-table td{padding:9px 10px;font-size:0.92rem;border-bottom:1px solid rgba(255,255,255,0.05);}
+  .lb-table tr.highlight td{color:var(--neon-gold);font-weight:700;}
+  .lb-rank{font-family:'Orbitron',monospace;font-weight:700;font-size:1rem;}
+  .lb-empty{color:rgba(255,255,255,0.3);font-size:0.88rem;padding:24px;text-align:center;display:block;}
+
+  /* GAME SCREEN */
+  #game-screen{padding:0;min-height:100vh;width:100%;max-width:900px;flex-direction:column;justify-content:flex-start;}
+  #hud{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;background:rgba(5,5,15,0.97);border-bottom:1px solid rgba(255,215,0,0.2);width:100%;z-index:10;flex-wrap:wrap;gap:5px;}
+  .hud-item{display:flex;flex-direction:column;align-items:center;}
+  .hud-label{font-size:0.58rem;letter-spacing:0.18em;color:rgba(255,255,255,0.4);text-transform:uppercase;}
+  .hud-value{font-family:'Orbitron',monospace;font-size:1.15rem;font-weight:700;color:var(--neon-gold);text-shadow:0 0 10px var(--neon-gold);}
+  #lives-display{color:var(--neon-pink);font-size:1rem;letter-spacing:2px;}
+
+  #timer-container{position:relative;width:54px;height:54px;}
+  #timer-svg{position:absolute;inset:0;transform:rotate(-90deg);}
+  #timer-circle{fill:none;stroke:var(--neon-cyan);stroke-width:4;stroke-dasharray:138;stroke-dashoffset:0;stroke-linecap:round;transition:stroke-dashoffset 0.1s linear,stroke 0.3s;filter:drop-shadow(0 0 4px var(--neon-cyan));}
+  #timer-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:0.95rem;font-weight:700;color:var(--neon-cyan);}
+
+  #speed-bar{display:flex;gap:3px;}
+  .speed-pip{width:9px;height:12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);transition:all 0.5s;}
+  .speed-pip.active{background:var(--neon-pink);border-color:var(--neon-pink);box-shadow:0 0 6px var(--neon-pink);}
+
+  /* POWER-UPS */
+  #powerup-bar{display:flex;gap:6px;align-items:center;}
+  .pu-slot{width:40px;height:40px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;font-size:1.2rem;cursor:pointer;position:relative;transition:all 0.2s;border-radius:4px;}
+  .pu-slot:hover:not(.empty):not(.used){transform:scale(1.12);box-shadow:0 0 12px rgba(255,215,0,0.5);}
+  .pu-slot.slow-time{border-color:var(--neon-cyan);background:rgba(0,255,255,0.1);}
+  .pu-slot.skip-q{border-color:var(--neon-gold);background:rgba(255,215,0,0.1);}
+  .pu-slot.shield{border-color:var(--neon-purple);background:rgba(191,0,255,0.1);}
+  .pu-slot.empty{opacity:0.22;cursor:default;}
+  .pu-slot.used{opacity:0.25;cursor:default;}
+
+  /* CANVAS */
+  #canvas-area{position:relative;width:100%;flex:1;overflow:hidden;background:#07071A;min-height:180px;}
+  canvas#game-canvas{display:block;width:100%;}
+  #feedback-flash{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 0.1s;z-index:5;}
+  #feedback-flash.correct{background:rgba(57,255,20,0.08);opacity:1;}
+  #feedback-flash.wrong{background:rgba(255,0,110,0.12);opacity:1;}
+
+  /* Warning */
+  #obstacle-warning{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:1.5rem;opacity:0;pointer-events:none;z-index:8;transition:opacity 0.3s;}
+  #obstacle-warning.show{opacity:1;animation:warnPulse 0.45s ease-in-out infinite alternate;}
+  @keyframes warnPulse{from{transform:translateY(-50%) scale(1);}to{transform:translateY(-50%) scale(1.35);}}
+
+  /* Speed notify */
+  #speed-notify{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Orbitron',monospace;font-size:1.6rem;font-weight:900;pointer-events:none;opacity:0;z-index:20;letter-spacing:0.1em;text-align:center;}
+  #speed-notify.show{animation:speedNotif 2s ease-out forwards;}
+  @keyframes speedNotif{0%{opacity:0;transform:translate(-50%,-50%) scale(0.5);}25%{opacity:1;transform:translate(-50%,-50%) scale(1.1);}75%{opacity:1;transform:translate(-50%,-50%) scale(1);}100%{opacity:0;transform:translate(-50%,-50%) scale(0.8);}}
+
+  /* LEVEL-UP OVERLAY */
+  #levelup-overlay{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;opacity:0;}
+  #levelup-overlay.active{pointer-events:all;animation:luBg 2.2s forwards;}
+  @keyframes luBg{0%{opacity:0;}15%{opacity:1;background:rgba(0,0,0,0.88);}80%{opacity:1;background:rgba(0,0,0,0.88);}100%{opacity:0;background:transparent;}}
+  #levelup-title{font-family:'Orbitron',monospace;font-weight:900;font-size:clamp(2rem,5vw,3.5rem);letter-spacing:0.08em;text-align:center;opacity:0;}
+  #levelup-overlay.active #levelup-title{animation:luTitle 2.2s forwards;}
+  @keyframes luTitle{0%{opacity:0;transform:scale(0.3) rotate(-8deg);}25%{opacity:1;transform:scale(1.08) rotate(0);}65%{opacity:1;transform:scale(1);}90%{opacity:1;}100%{opacity:0;}}
+  .levelup-sparks{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+  .spark{position:absolute;border-radius:50%;animation:sparkFly 1.3s ease-out forwards;}
+  @keyframes sparkFly{0%{opacity:1;transform:translate(0,0) scale(1);}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0);}}
+
+  /* Power-up notification */
+  .pu-notify{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:'Orbitron',monospace;font-size:0.8rem;font-weight:700;padding:5px 16px;border-radius:2px;pointer-events:none;z-index:15;animation:puAnim 2s forwards;white-space:nowrap;}
+  @keyframes puAnim{0%{opacity:0;transform:translateX(-50%) translateY(-8px);}15%{opacity:1;transform:translateX(-50%) translateY(0);}70%{opacity:1;}100%{opacity:0;}}
+
+  /* Score popup */
+  .score-popup{position:absolute;font-family:'Orbitron',monospace;font-size:1.2rem;font-weight:700;pointer-events:none;z-index:20;animation:scoreFloat 1s ease-out forwards;}
+  @keyframes scoreFloat{0%{opacity:1;transform:translateY(0) scale(1);}100%{opacity:0;transform:translateY(-60px) scale(1.3);}}
+
+  /* QUESTION PANEL */
+  #question-panel{width:100%;background:rgba(5,5,20,0.97);border-top:2px solid rgba(255,215,0,0.3);padding:13px 14px 11px;}
+  #question-category{font-size:0.62rem;letter-spacing:0.3em;color:var(--neon-cyan);text-transform:uppercase;margin-bottom:4px;}
+  #question-text{font-size:clamp(0.92rem,2.3vw,1.15rem);font-weight:600;color:#fff;margin-bottom:10px;min-height:2.4em;line-height:1.3;}
+  #answer-buttons{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .ans-btn{font-family:'Rajdhani',sans-serif;font-size:clamp(0.88rem,1.9vw,1.02rem);font-weight:600;letter-spacing:0.04em;padding:12px 8px;background:rgba(255,255,255,0.04);color:#fff;border:1px solid rgba(255,255,255,0.15);cursor:pointer;transition:all 0.2s;}
+  .ans-btn:hover:not(:disabled){background:rgba(255,215,0,0.1);border-color:var(--neon-gold);color:var(--neon-gold);transform:translateY(-2px);box-shadow:0 4px 18px rgba(255,215,0,0.2);}
+  .ans-btn.correct{background:rgba(57,255,20,0.2);border-color:var(--neon-green);color:var(--neon-green);box-shadow:0 0 20px rgba(57,255,20,0.35);}
+  .ans-btn.wrong{background:rgba(255,0,110,0.2);border-color:var(--neon-pink);color:var(--neon-pink);box-shadow:0 0 18px rgba(255,0,110,0.3);}
+  .ans-btn:disabled{cursor:not-allowed;}
+
+  /* RESULT */
+  .result-title{font-family:'Orbitron',monospace;font-size:clamp(1.8rem,5vw,3.5rem);font-weight:900;letter-spacing:0.05em;margin-bottom:8px;}
+  .result-title.win{color:var(--neon-gold);text-shadow:0 0 40px var(--neon-gold);}
+  .result-title.lose{color:var(--neon-pink);text-shadow:0 0 40px var(--neon-pink);}
+  .result-stats{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:18px 0;}
+  .stat-box{background:var(--panel-bg);border:1px solid rgba(255,255,255,0.1);padding:14px 18px;min-width:100px;}
+  .stat-val{font-family:'Orbitron',monospace;font-size:1.8rem;font-weight:700;color:var(--neon-gold);}
+  .stat-lbl{font-size:0.68rem;letter-spacing:0.2em;color:rgba(255,255,255,0.4);text-transform:uppercase;margin-top:3px;}
+  .review-list{max-width:580px;text-align:left;margin:0 auto 18px;max-height:150px;overflow-y:auto;}
+  .review-item{display:flex;align-items:flex-start;gap:7px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.83rem;}
+  .review-q{color:rgba(255,255,255,0.7);flex:1;}
+  .review-a{color:var(--neon-green);font-weight:600;font-size:0.76rem;}
+  ::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:rgba(255,215,0,0.3);border-radius:2px;}
+</style>
+</head>
+<body>
+<div id="game-wrapper">
+
+  <!-- TITLE -->
+  <div id="title-screen" class="screen active">
+    <span class="treble-clef">𝄞</span>
+    <div id="title-logo">CLEF HANGER</div>
+    <p class="tagline">Music Theory · Speed · Survival</p>
+    <div class="staff-lines"><span class="staff-note">♩</span><span class="staff-note">♪</span><span class="staff-note">♫</span></div>
+    <br>
+    <button class="btn-primary" onclick="showScreen('level-screen')">START GAME</button>
+    <button class="btn-primary btn-cyan" onclick="showScreen('how-to-screen')">HOW TO PLAY</button>
+    <button class="btn-primary btn-pink" onclick="showScreen('leaderboard-screen');renderLeaderboard()">🏆 LEADERBOARD</button>
+  </div>
+
+  <!-- HOW TO PLAY -->
+  <div id="how-to-screen" class="screen">
+    <div class="screen-title">HOW TO PLAY</div>
+    <div style="max-width:500px;text-align:left;line-height:1.9;color:rgba(255,255,255,0.82);font-size:1rem;">
+      <p>🎵 Answer music theory questions to keep your runner alive.</p><br>
+      <p>⚡ Correct answer = runner <strong style="color:var(--neon-green)">jumps</strong> the obstacle safely. Wrong or timeout = runner <strong style="color:var(--neon-pink)">crashes</strong> and loses a life.</p><br>
+      <p>⏱ Every <strong style="color:var(--neon-gold)">7 questions</strong>, speed increases by 1 second — down to 5s at max.</p><br>
+      <p>🎁 <strong style="color:var(--neon-gold)">Power-ups</strong> appear randomly — tap to use:</p>
+      <p style="margin-left:14px;">🕐 <strong style="color:var(--neon-cyan)">Slow Time</strong> — doubles your remaining time</p>
+      <p style="margin-left:14px;">⏭ <strong style="color:var(--neon-gold)">Skip</strong> — skip question with no penalty</p>
+      <p style="margin-left:14px;">🛡 <strong style="color:var(--neon-purple)">Shield</strong> — absorbs one collision</p><br>
+      <p>🏆 Scores are saved to the leaderboard. Streak bonuses multiply your points!</p>
+    </div><br>
+    <button class="btn-primary" onclick="showScreen('level-screen')">GOT IT</button>
+    <button class="btn-primary btn-cyan" onclick="showScreen('title-screen')">BACK</button>
+  </div>
+
+  <!-- LEVEL SELECT -->
+  <div id="level-screen" class="screen">
+    <div class="screen-title">SELECT DIFFICULTY</div>
+    <p style="color:rgba(255,255,255,0.5);margin-bottom:6px;">Starting time per question</p>
+    <div class="diff-cards">
+      <div class="diff-card selected" onclick="selectDiff(this,'easy')">
+        <div class="diff-name" style="color:var(--neon-green)">EASY</div>
+        <div class="diff-time">15s</div>
+        <div class="diff-desc">Beginner friendly</div>
+      </div>
+      <div class="diff-card" onclick="selectDiff(this,'medium')">
+        <div class="diff-name" style="color:var(--neon-gold)">MEDIUM</div>
+        <div class="diff-time">10s</div>
+        <div class="diff-desc">For the trained ear</div>
+      </div>
+      <div class="diff-card" onclick="selectDiff(this,'hard')">
+        <div class="diff-name" style="color:var(--neon-pink)">HARD</div>
+        <div class="diff-time">5s</div>
+        <div class="diff-desc">Max speed from start</div>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="startGame()">PLAY →</button>
+    <button class="btn-primary btn-cyan" onclick="showScreen('title-screen')">BACK</button>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div id="leaderboard-screen" class="screen">
+    <div class="screen-title" style="color:var(--neon-gold)">🏆 LEADERBOARD</div>
+    <table class="lb-table">
+      <thead><tr><th>#</th><th>PLAYER</th><th>SCORE</th><th>DIFF</th><th>SPEED LV</th></tr></thead>
+      <tbody id="lb-body"></tbody>
+    </table>
+    <button class="btn-primary btn-pink" onclick="clearLeaderboard()" style="font-size:0.75rem;padding:10px 24px;">CLEAR SCORES</button>
+    <button class="btn-primary btn-cyan" onclick="showScreen('title-screen')">BACK</button>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="game-screen" class="screen">
+    <div id="hud">
+      <div class="hud-item"><span class="hud-label">Score</span><span class="hud-value" id="score-display">0</span></div>
+      <div class="hud-item"><span class="hud-label">Question</span><span class="hud-value" id="q-counter">1/35</span></div>
+      <div id="timer-container">
+        <svg id="timer-svg" viewBox="0 0 54 54" width="54" height="54">
+          <circle cx="27" cy="27" r="22" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="4"/>
+          <circle id="timer-circle" cx="27" cy="27" r="22"/>
+        </svg>
+        <div id="timer-text">15</div>
+      </div>
+      <div class="hud-item"><span class="hud-label">Lives</span><span class="hud-value" id="lives-display">♥♥♥</span></div>
+      <div class="hud-item">
+        <span class="hud-label">Power-ups</span>
+        <div id="powerup-bar">
+          <div class="pu-slot empty" id="pu-0" onclick="usePowerup(0)" title="Slow Time">🕐</div>
+          <div class="pu-slot empty" id="pu-1" onclick="usePowerup(1)" title="Skip Question">⏭</div>
+          <div class="pu-slot empty" id="pu-2" onclick="usePowerup(2)" title="Shield">🛡</div>
+        </div>
+      </div>
+      <div class="hud-item"><span class="hud-label">Speed</span><div id="speed-bar"><div class="speed-pip active"></div><div class="speed-pip"></div><div class="speed-pip"></div><div class="speed-pip"></div><div class="speed-pip"></div></div></div>
+    </div>
+    <div id="canvas-area">
+      <canvas id="game-canvas"></canvas>
+      <div id="feedback-flash"></div>
+      <div id="obstacle-warning">⚠️</div>
+      <div id="speed-notify"></div>
+    </div>
+    <div id="question-panel">
+      <div id="question-category">Music Theory</div>
+      <div id="question-text">Loading...</div>
+      <div id="answer-buttons">
+        <button class="ans-btn" id="ans-0" onclick="answer(0)"></button>
+        <button class="ans-btn" id="ans-1" onclick="answer(1)"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="result-screen" class="screen">
+    <div class="result-title" id="result-title">GAME OVER</div>
+    <div id="result-subtitle" style="color:rgba(255,255,255,0.5);margin-bottom:8px;letter-spacing:0.1em;font-size:0.9rem;"></div>
+    <div class="result-stats">
+      <div class="stat-box"><div class="stat-val" id="res-score">0</div><div class="stat-lbl">Score</div></div>
+      <div class="stat-box"><div class="stat-val" id="res-correct">0</div><div class="stat-lbl">Correct</div></div>
+      <div class="stat-box"><div class="stat-val" id="res-streak">0</div><div class="stat-lbl">Best Streak</div></div>
+      <div class="stat-box"><div class="stat-val" id="res-level">1</div><div class="stat-lbl">Max Speed</div></div>
+    </div>
+    <div style="width:100%;">
+      <p style="font-size:0.68rem;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:6px;">REVIEW</p>
+      <div class="review-list" id="review-list"></div>
+    </div>
+    <button class="btn-primary" onclick="startGame()">PLAY AGAIN</button>
+    <button class="btn-primary btn-pink" onclick="showScreen('leaderboard-screen');renderLeaderboard()">🏆 LEADERBOARD</button>
+    <button class="btn-primary btn-cyan" onclick="showScreen('level-screen')">CHANGE LEVEL</button>
+    <button class="btn-primary" style="color:rgba(255,255,255,0.4);border-color:rgba(255,255,255,0.15);font-size:0.78rem;padding:9px 28px;" onclick="showScreen('title-screen')">MAIN MENU</button>
+  </div>
+
+  <!-- LEVEL-UP OVERLAY -->
+  <div id="levelup-overlay">
+    <div class="levelup-sparks" id="levelup-sparks"></div>
+    <div id="levelup-title"></div>
+  </div>
+
+</div>
+<script>
+// ===== QUESTIONS =====
+const QUESTIONS = [
+  // Intervals
+  {c:"Intervals",q:"How many semitones in a perfect 5th?",o:["7","8"],a:0},
+  {c:"Intervals",q:"What interval spans 4 semitones?",o:["Major 3rd","Minor 3rd"],a:0},
+  {c:"Intervals",q:"A tritone divides the octave into:",o:["2 equal parts","3 equal parts"],a:0},
+  {c:"Intervals",q:"How many semitones in a minor 7th?",o:["10","11"],a:0},
+  {c:"Intervals",q:"A major 2nd spans how many semitones?",o:["2","3"],a:0},
+  {c:"Intervals",q:"The interval C to E is a:",o:["Major 3rd","Minor 3rd"],a:0},
+  {c:"Intervals",q:"C to G is a:",o:["Perfect 5th","Augmented 5th"],a:0},
+  {c:"Intervals",q:"How many semitones in an octave?",o:["12","8"],a:0},
+  {c:"Intervals",q:"A minor 2nd is also called a:",o:["Half step","Whole step"],a:0},
+  {c:"Intervals",q:"D to F is a:",o:["Minor 3rd","Major 3rd"],a:0},
+  // Scales
+  {c:"Scales",q:"How many notes in a major scale?",o:["7","8"],a:0},
+  {c:"Scales",q:"The C major scale has how many sharps?",o:["0","1"],a:0},
+  {c:"Scales",q:"Natural minor uses the same notes as which major?",o:["Relative major","Parallel major"],a:0},
+  {c:"Scales",q:"The pentatonic scale has how many notes?",o:["5","6"],a:0},
+  {c:"Scales",q:"Which pattern is W-W-H-W-W-W-H?",o:["Major","Minor"],a:0},
+  {c:"Scales",q:"G major has how many sharps?",o:["1","2"],a:0},
+  {c:"Scales",q:"The blues scale is based on:",o:["Pentatonic minor","Pentatonic major"],a:0},
+  {c:"Scales",q:"F major has how many flats?",o:["1","2"],a:0},
+  {c:"Scales",q:"The Dorian mode is which scale degree?",o:["2nd","3rd"],a:0},
+  {c:"Scales",q:"A chromatic scale has how many pitches per octave?",o:["12","7"],a:0},
+  // Chords
+  {c:"Chords",q:"A major triad intervals are:",o:["M3 + m3","m3 + M3"],a:0},
+  {c:"Chords",q:"How many notes in a basic triad?",o:["3","4"],a:0},
+  {c:"Chords",q:"A dominant 7th is built on scale degree:",o:["5","4"],a:0},
+  {c:"Chords",q:"C major triad notes are:",o:["C-E-G","C-Eb-G"],a:0},
+  {c:"Chords",q:"What makes a chord diminished?",o:["Two stacked minor 3rds","Two stacked major 3rds"],a:0},
+  {c:"Chords",q:"A suspended chord replaces the 3rd with a:",o:["2nd or 4th","5th"],a:0},
+  {c:"Chords",q:"An augmented chord has:",o:["Two major 3rds","Two minor 3rds"],a:0},
+  {c:"Chords",q:"The ii chord in a major key is:",o:["Minor","Major"],a:0},
+  {c:"Chords",q:"In C major, the IV chord is:",o:["F major","G major"],a:0},
+  {c:"Chords",q:"A major 7th chord uses which 7th?",o:["Major 7th","Minor 7th"],a:0},
+  // Rhythm
+  {c:"Rhythm",q:"A whole note in 4/4 gets how many beats?",o:["4","2"],a:0},
+  {c:"Rhythm",q:"A dotted quarter note equals:",o:["1.5 beats","2 beats"],a:0},
+  {c:"Rhythm",q:"What does BPM stand for?",o:["Beats Per Minute","Bars Per Measure"],a:0},
+  {c:"Rhythm",q:"A half note gets how many beats in 4/4?",o:["2","3"],a:0},
+  {c:"Rhythm",q:"Common time (C) is equivalent to:",o:["4/4","3/4"],a:0},
+  {c:"Rhythm",q:"A triplet divides a beat into:",o:["3 equal parts","2 equal parts"],a:0},
+  {c:"Rhythm",q:"A sixteenth note is worth how many eighth notes?",o:["½","2"],a:0},
+  {c:"Rhythm",q:"Which time signature has 3 beats per measure?",o:["3/4","4/4"],a:0},
+  // Key Signatures
+  {c:"Key Sigs",q:"D major has how many sharps?",o:["2","3"],a:0},
+  {c:"Key Sigs",q:"B♭ major has how many flats?",o:["2","3"],a:0},
+  {c:"Key Sigs",q:"A major has how many sharps?",o:["3","4"],a:0},
+  {c:"Key Sigs",q:"E♭ major has how many flats?",o:["3","2"],a:0},
+  {c:"Key Sigs",q:"The relative minor of C major is:",o:["A minor","E minor"],a:0},
+  {c:"Key Sigs",q:"The key with 6 sharps is:",o:["F# major","B major"],a:0},
+  {c:"Key Sigs",q:"The order of sharps begins with:",o:["F-C-G","C-G-D"],a:0},
+  {c:"Key Sigs",q:"The order of flats begins with:",o:["B-E-A","E-B-A"],a:0},
+  {c:"Key Sigs",q:"E major has how many sharps?",o:["4","5"],a:0},
+  {c:"Key Sigs",q:"The relative minor of G major is:",o:["E minor","B minor"],a:0},
+  // Dynamics
+  {c:"Dynamics",q:"What does 'forte' (f) mean?",o:["Loud","Soft"],a:0},
+  {c:"Dynamics",q:"What does 'piano' (p) mean?",o:["Soft","Loud"],a:0},
+  {c:"Dynamics",q:"What does 'mezzo-forte' (mf) mean?",o:["Moderately loud","Moderately soft"],a:0},
+  {c:"Dynamics",q:"'Crescendo' means:",o:["Gradually louder","Gradually softer"],a:0},
+  {c:"Dynamics",q:"'Diminuendo' means:",o:["Gradually softer","Gradually louder"],a:0},
+  {c:"Dynamics",q:"What does 'fortissimo' (ff) mean?",o:["Very loud","Very soft"],a:0},
+  {c:"Dynamics",q:"What does 'pianissimo' (pp) mean?",o:["Very soft","Very loud"],a:0},
+  {c:"Dynamics",q:"'Sforzando' (sfz) means:",o:["Sudden accent","Fade out"],a:0},
+  // Composers
+  {c:"Composers",q:"Who composed the Four Seasons?",o:["Vivaldi","Handel"],a:0},
+  {c:"Composers",q:"Who wrote Symphony No. 5 in C minor?",o:["Beethoven","Brahms"],a:0},
+  {c:"Composers",q:"Who composed The Magic Flute?",o:["Mozart","Haydn"],a:0},
+  {c:"Composers",q:"Bach was a master of:",o:["Baroque counterpoint","Classical sonata form"],a:0},
+  {c:"Composers",q:"Who composed the Moonlight Sonata?",o:["Beethoven","Schubert"],a:0},
+  {c:"Composers",q:"'The Rite of Spring' was composed by:",o:["Stravinsky","Debussy"],a:0},
+  {c:"Composers",q:"Who wrote the opera 'La Traviata'?",o:["Verdi","Puccini"],a:0},
+  {c:"Composers",q:"Chopin was primarily a composer of:",o:["Piano music","Opera"],a:0},
+];
+
+// ===== UTILS =====
+const shuffle = arr => { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+
+// ===== LEADERBOARD =====
+const LB_KEY = 'clefhanger_lb_v3';
+const getLB  = () => { try{return JSON.parse(localStorage.getItem(LB_KEY))||[];}catch{return[];} };
+function saveScore(entry) {
+  const lb = getLB(); lb.push(entry); lb.sort((a,b)=>b.score-a.score); lb.splice(10);
+  localStorage.setItem(LB_KEY, JSON.stringify(lb));
+}
+function clearLeaderboard() {
+  if(confirm('Clear all scores?')){ localStorage.removeItem(LB_KEY); renderLeaderboard(); }
+}
+function renderLeaderboard(hl) {
+  const lb = getLB();
+  const tbody = document.getElementById('lb-body');
+  if(!lb.length){ tbody.innerHTML='<tr><td colspan="5"><span class="lb-empty">No scores yet — be the first!</span></td></tr>'; return; }
+  const med = ['🥇','🥈','🥉'];
+  tbody.innerHTML = lb.map((e,i)=>{
+    const cls = (hl!==undefined && e.score===hl && i===lb.findIndex(x=>x.score===hl)) ? 'highlight' : '';
+    return `<tr class="${cls}"><td class="lb-rank">${med[i]||(i+1)}</td><td>${e.name}</td><td style="color:var(--neon-gold);font-family:'Orbitron',monospace;">${e.score.toLocaleString()}</td><td style="text-transform:capitalize;">${e.diff}</td><td>Lv.${e.level}</td></tr>`;
+  }).join('');
+}
+
+// ===== SETTINGS =====
+const DIFF = { easy:{startTime:15,minTime:5,stepQ:7}, medium:{startTime:10,minTime:5,stepQ:7}, hard:{startTime:5,minTime:5,stepQ:7} };
+let selectedDiff = 'easy';
+function selectDiff(el,d){ document.querySelectorAll('.diff-card').forEach(c=>c.classList.remove('selected')); el.classList.add('selected'); selectedDiff=d; }
+function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+
+// ===== POWER-UPS =====
+const PU_EMOJI = {'slow-time':'🕐','skip-q':'⏭','shield':'🛡'};
+let powerups=[null,null,null], shieldActive=false;
+
+function resetPowerups(){ powerups=[null,null,null]; shieldActive=false; renderPUBar(); }
+function renderPUBar(){
+  ['slow-time','skip-q','shield'].forEach((def,i)=>{
+    const el=document.getElementById(`pu-${i}`);
+    el.className='pu-slot';
+    if(!powerups[i]){ el.classList.add('empty'); el.textContent=PU_EMOJI[def]; return; }
+    el.classList.add(powerups[i]); el.textContent=PU_EMOJI[powerups[i]];
+  });
+}
+function tryGrantPowerup(){
+  if(Math.random()>0.28) return;
+  const free=powerups.map((v,i)=>v===null?i:-1).filter(i=>i>=0);
+  if(!free.length) return;
+  const slot=free[Math.floor(Math.random()*free.length)];
+  const types=['slow-time','skip-q','shield'];
+  const available=types.filter(t=>!powerups.includes(t));
+  if(!available.length) return;
+  const type=available[Math.floor(Math.random()*available.length)];
+  powerups[slot]=type;
+  renderPUBar();
+  showPUNotify(`+${PU_EMOJI[type]} POWER-UP EARNED!`,'var(--neon-gold)');
+}
+function usePowerup(slot){
+  if(!state.gameActive||state.answered) return;
+  const type=powerups[slot]; if(!type) return;
+  powerups[slot]=null; renderPUBar(); applyPowerup(type);
+}
+function applyPowerup(type){
+  if(type==='slow-time'){
+    const rem=state.timeLeft; clearInterval(state.timerInterval);
+    const newTotal=rem*2;
+    if(currentObstacle) currentObstacle.speed*=0.5;
+    state.timeLeft=newTotal;
+    let elapsed=0; updateTimerDisplay(newTotal,newTotal);
+    state.timerInterval=setInterval(()=>{
+      elapsed+=0.1; state.timeLeft=newTotal-elapsed;
+      if(state.timeLeft<=0){ state.timeLeft=0; updateTimerDisplay(0,newTotal); clearInterval(state.timerInterval); if(!state.answered) timeOut(); }
+      else updateTimerDisplay(state.timeLeft,newTotal);
+    },100);
+    showPUNotify('🕐 SLOW TIME!','var(--neon-cyan)');
+  } else if(type==='skip-q'){
+    clearInterval(state.timerInterval); state.answered=true;
+    if(currentObstacle) currentObstacle.safePass=true;
+    const q=state.shuffledQ[state.currentQ];
+    const cb=document.getElementById('ans-0').dataset.correct==='true'?document.getElementById('ans-0'):document.getElementById('ans-1');
+    state.reviewLog.push({correct:true,q:q.q,correctAnswer:cb.textContent,skipped:true});
+    state.currentQ++; state.questionsThisLevel++;
+    checkSpeedUp(); showPUNotify('⏭ SKIPPED!','var(--neon-gold)');
+    setTimeout(loadQuestion,800);
+  } else if(type==='shield'){
+    shieldActive=true; showPUNotify('🛡 SHIELD ACTIVE!','var(--neon-purple)');
+  }
+}
+function showPUNotify(text,color){
+  const area=document.getElementById('canvas-area');
+  const old=area.querySelector('.pu-notify'); if(old) old.remove();
+  const el=document.createElement('div'); el.className='pu-notify'; el.textContent=text;
+  el.style.color=color; el.style.border=`1px solid ${color}`; el.style.background='rgba(0,0,0,0.85)';
+  area.appendChild(el); setTimeout(()=>el.remove(),2000);
+}
+
+// ===== GAME STATE =====
+let state={};
+function startGame(){
+  const s=DIFF[selectedDiff];
+  state={score:0,lives:3,currentQ:0,totalQ:35,timeLeft:s.startTime,startTime:s.startTime,
+    timerInterval:null,answered:false,streak:0,bestStreak:0,speedLevel:1,
+    questionsThisLevel:0,reviewLog:[],shuffledQ:shuffle(QUESTIONS),difficulty:selectedDiff,gameActive:true};
+  resetPowerups();
+  showScreen('game-screen');
+  setTimeout(()=>{ initCanvas(); requestAnimationFrame(gameLoop); loadQuestion(); },50);
+}
+
+// ===== CANVAS =====
+const canvas=document.getElementById('game-canvas'), ctx=canvas.getContext('2d');
+let animFrameId, runnerX, groundY, runnerY, jumpVel, isJumping;
+let obstacles=[], particles=[], bgOffset=0;
+let currentObstacle=null, obstacleJumpQueued=false;
+let runnerInvincible=false, runnerFlash=false, flashTimer=0;
+let stars=[], skyIntensity=0, warningShown=false;
+
+function initCanvas(){
+  const area=document.getElementById('canvas-area');
+  canvas.width=area.clientWidth; canvas.height=Math.min(210,window.innerHeight*0.23);
+  groundY=canvas.height-46; runnerX=90; runnerY=groundY;
+  jumpVel=0; isJumping=false; obstacles=[]; particles=[]; bgOffset=0;
+  currentObstacle=null; obstacleJumpQueued=false; runnerInvincible=false; warningShown=false; skyIntensity=0;
+  stars=Array.from({length:80},()=>({x:Math.random()*canvas.width,y:Math.random()*canvas.height*0.75,r:Math.random()*1.8+0.3,alpha:Math.random()*0.7+0.2,speed:Math.random()*0.3+0.1}));
+}
+
+function getOHB(o){ // obstacle hitbox
+  if(o.type==='block')  return {x:o.x-14,y:groundY-28,w:28,h:30};
+  if(o.type==='spike')  return {x:o.x-13,y:groundY-34,w:30,h:36};
+  return {x:o.x-21,y:groundY-38,w:42,h:40};
+}
+function getRHB(){ return {x:runnerX-7,y:runnerY-48,w:14,h:48}; }
+function overlap(a,b){ return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y; }
+
+function spawnObstacle(totalSecs){
+  if(!state.gameActive) return;
+  const types=['block','spike','double'];
+  const type=types[Math.floor(Math.random()*types.length)];
+  const startX=canvas.width+30;
+  const speed=(startX-runnerX)/(totalSecs*60);
+  const obs={x:startX,type,speed,collided:false,passed:false,safePass:false};
+  currentObstacle=obs; obstacles.push(obs); warningShown=false;
+}
+
+function gameLoop(){
+  if(!state.gameActive) return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Sky reacts to speed level
+  const maxLv=11; skyIntensity=Math.min(1,(state.speedLevel-1)/maxLv);
+  const sky=ctx.createLinearGradient(0,0,0,canvas.height);
+  sky.addColorStop(0,`rgb(${6+skyIntensity*25},${6},${20+skyIntensity*35})`);
+  sky.addColorStop(1,`rgb(${12+skyIntensity*30},${12},${40+skyIntensity*45})`);
+  ctx.fillStyle=sky; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // Stars streak faster at higher speed
+  const streak=1+skyIntensity*16;
+  stars.forEach(s=>{
+    s.x-=s.speed*(1+skyIntensity*5); if(s.x<-20) s.x=canvas.width+5;
+    ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(s.x+streak,s.y);
+    ctx.strokeStyle=`rgba(255,255,255,${s.alpha})`; ctx.lineWidth=s.r; ctx.stroke();
+  });
+
+  // Staff lines
+  bgOffset=(bgOffset+(1+skyIntensity*1.5)*0.4)%120;
+  ctx.strokeStyle=`rgba(255,215,0,${0.06+skyIntensity*0.07})`; ctx.lineWidth=1;
+  for(let i=0;i<5;i++){ const y=groundY-70+i*12; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); }
+
+  // Ground
+  const gg=ctx.createLinearGradient(0,groundY+18,0,canvas.height);
+  gg.addColorStop(0,`rgba(0,255,255,${0.25+skyIntensity*0.2})`); gg.addColorStop(1,'rgba(0,0,50,0)');
+  ctx.fillStyle=gg; ctx.fillRect(0,groundY+18,canvas.width,canvas.height-groundY-18);
+  ctx.beginPath(); ctx.moveTo(0,groundY+18); ctx.lineTo(canvas.width,groundY+18);
+  ctx.strokeStyle=`rgba(0,255,255,${0.7+skyIntensity*0.3})`; ctx.lineWidth=2;
+  ctx.shadowColor='#00FFFF'; ctx.shadowBlur=8+skyIntensity*12; ctx.stroke(); ctx.shadowBlur=0;
+
+  // Perspective grid
+  const gOff=(bgOffset*2)%40; ctx.strokeStyle=`rgba(0,255,255,${0.1+skyIntensity*0.1})`; ctx.lineWidth=1;
+  for(let x=-gOff;x<canvas.width;x+=40){ ctx.beginPath(); ctx.moveTo(x,groundY+18); ctx.lineTo(x-18,canvas.height); ctx.stroke(); }
+
+  // Runner physics
+  if(isJumping){ runnerY+=jumpVel; jumpVel+=0.75; if(runnerY>=groundY){runnerY=groundY;isJumping=false;jumpVel=0;} }
+
+  // Warning indicator
+  const warn=document.getElementById('obstacle-warning');
+  if(currentObstacle&&!currentObstacle.passed&&!currentObstacle.collided){
+    const dist=currentObstacle.x-runnerX;
+    if(dist<240&&dist>0&&!warningShown) warn.classList.add('show');
+    else if(dist<=0||currentObstacle.passed){warn.classList.remove('show');warningShown=true;}
+  }
+
+  // Obstacles
+  obstacles=obstacles.filter(o=>o.x>-80);
+  obstacles.forEach(o=>{
+    o.x-=o.speed;
+    // Auto-jump when correct
+    if(o===currentObstacle&&obstacleJumpQueued&&!o.passed){
+      const d=o.x-runnerX;
+      if(d<120&&d>0&&!isJumping&&runnerY>=groundY){isJumping=true;jumpVel=-14;}
+    }
+    // Collision
+    if(!o.collided&&!o.passed&&!runnerInvincible&&!o.safePass){
+      if(overlap(getRHB(),getOHB(o))){ o.collided=true; handleCrash(); }
+    }
+    if(o.x<runnerX-30&&!o.collided) o.passed=true;
+    drawObstacle(o);
+  });
+
+  // Runner draw
+  flashTimer--; runnerFlash=runnerInvincible&&flashTimer%8<4;
+  if(!runnerFlash) drawRunner(runnerX,runnerY);
+
+  // Particles
+  particles=particles.filter(p=>p.life>0);
+  particles.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;p.life--;p.vy+=0.12;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${p.color},${p.life/p.maxLife})`;ctx.fill();
+  });
+
+  animFrameId=requestAnimationFrame(gameLoop);
+}
+
+function handleCrash(){
+  if(shieldActive){
+    shieldActive=false; emitParticles(runnerX,runnerY-25,'191,0,255',20);
+    showPUNotify('🛡 SHIELD ABSORBED HIT!','var(--neon-purple)');
+    runnerInvincible=true;flashTimer=60;setTimeout(()=>{runnerInvincible=false;},1000); return;
+  }
+  emitParticles(runnerX,runnerY-25,'255,0,110',18);
+  runnerInvincible=true;flashTimer=90;setTimeout(()=>{runnerInvincible=false;},1500);
+  state.lives--;updateLives();if(state.lives<=0) endGame(false);
+}
+
+function drawRunner(x,y){
+  const t=Date.now()*0.01,bobY=Math.sin(t*3)*2,legSwing=Math.sin(t*6)*8;
+  ctx.save();
+  if(shieldActive){
+    ctx.beginPath();ctx.arc(x,y-25+bobY,34,0,Math.PI*2);
+    const sg=ctx.createRadialGradient(x,y-25,10,x,y-25,34);
+    sg.addColorStop(0,'rgba(191,0,255,0)');sg.addColorStop(0.7,'rgba(191,0,255,0.15)');sg.addColorStop(1,'rgba(191,0,255,0.5)');
+    ctx.fillStyle=sg;ctx.fill();
+    ctx.strokeStyle='rgba(191,0,255,0.8)';ctx.lineWidth=2;ctx.shadowColor='#BF00FF';ctx.shadowBlur=15;ctx.stroke();ctx.shadowBlur=0;
+  }
+  ctx.shadowColor='#00FFFF';ctx.shadowBlur=15;
+  ctx.fillStyle='#00FFFF';ctx.fillRect(x-10,y-35+bobY,20,22);
+  ctx.fillStyle='#7DF9FF';ctx.fillRect(x-8,y-52+bobY,16,15);
+  ctx.fillStyle='#05050F';ctx.font='10px serif';ctx.fillText('♪',x-5,y-28+bobY);
+  ctx.fillRect(x-4,y-47+bobY,3,4);ctx.fillRect(x+2,y-47+bobY,3,4);
+  ctx.strokeStyle='#00FFFF';ctx.lineWidth=3;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(x-5,y-13+bobY);ctx.lineTo(x-7+legSwing*0.5,y+5);ctx.lineTo(x-14+legSwing,y+5);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x+5,y-13+bobY);ctx.lineTo(x+7-legSwing*0.5,y+5);ctx.lineTo(x+14-legSwing,y+5);ctx.stroke();
+  ctx.shadowBlur=0;ctx.restore();
+}
+
+function drawObstacle(o){
+  ctx.save();
+  if(o.type==='block'){
+    ctx.shadowColor='#FF006E';ctx.shadowBlur=12;ctx.fillStyle='#FF006E';
+    ctx.fillRect(o.x-15,groundY-28,30,30);
+    ctx.fillStyle='#fff';ctx.font='14px serif';ctx.fillText('𝄻',o.x-7,groundY-10);
+  } else if(o.type==='spike'){
+    ctx.shadowColor='#FFD700';ctx.shadowBlur=12;ctx.fillStyle='#FFD700';
+    ctx.beginPath();ctx.moveTo(o.x,groundY-35);ctx.lineTo(o.x+15,groundY+2);ctx.lineTo(o.x-15,groundY+2);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#FF8800';
+    ctx.beginPath();ctx.moveTo(o.x+20,groundY-25);ctx.lineTo(o.x+30,groundY+2);ctx.lineTo(o.x+10,groundY+2);ctx.closePath();ctx.fill();
+  } else {
+    ctx.shadowColor='#B800FF';ctx.shadowBlur=12;ctx.fillStyle='#B800FF';
+    ctx.fillRect(o.x-20,groundY-25,20,25);ctx.fillRect(o.x+5,groundY-38,18,40);
+  }
+  ctx.shadowBlur=0;ctx.restore();
+}
+
+function triggerJump(){ if(!isJumping&&state.gameActive&&runnerY>=groundY){isJumping=true;jumpVel=-14;} }
+document.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();triggerJump();}});
+canvas.addEventListener('click',triggerJump);
+canvas.addEventListener('touchstart',e=>{e.preventDefault();triggerJump();});
+
+function emitParticles(x,y,color,count=12){
+  for(let i=0;i<count;i++) particles.push({x,y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.8)*5,r:Math.random()*3+1,color,life:40,maxLife:40});
+}
+
+// ===== LEVEL-UP CUTSCENE =====
+function showLevelUp(newLevel, newTime){
+  const overlay=document.getElementById('levelup-overlay');
+  const title=document.getElementById('levelup-title');
+  const sparks=document.getElementById('levelup-sparks');
+  const colors=['#FFD700','#00FFFF','#FF006E','#39FF14','#BF00FF'];
+  title.innerHTML=`<span style="color:var(--neon-pink);font-size:0.55em;display:block;letter-spacing:0.35em;margin-bottom:4px;">⚡ SPEED UP! ⚡</span>
+    <span style="background:linear-gradient(135deg,#FFD700,#FF006E);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">LEVEL ${newLevel}</span>
+    <span style="color:rgba(255,255,255,0.5);font-size:0.42em;display:block;margin-top:8px;letter-spacing:0.2em;">${newTime}s PER QUESTION</span>`;
+  sparks.innerHTML='';
+  for(let i=0;i<45;i++){
+    const s=document.createElement('div'); s.className='spark';
+    s.style.left='50%'; s.style.top='50%';
+    s.style.background=colors[i%colors.length];
+    const angle=(i/45)*Math.PI*2, dist=80+Math.random()*220;
+    s.style.setProperty('--tx',`${Math.cos(angle)*dist}px`);
+    s.style.setProperty('--ty',`${Math.sin(angle)*dist}px`);
+    s.style.animationDelay=`${Math.random()*0.35}s`;
+    const sz=Math.random()*5+3; s.style.width=s.style.height=sz+'px';
+    sparks.appendChild(s);
+  }
+  overlay.classList.remove('active'); void overlay.offsetWidth; overlay.classList.add('active');
+  setTimeout(()=>overlay.classList.remove('active'),2300);
+}
+
+// ===== GAME LOGIC =====
+function loadQuestion(){
+  if(!state.gameActive) return;
+  if(state.currentQ>=state.totalQ||state.currentQ>=state.shuffledQ.length){endGame(true);return;}
+  tryGrantPowerup();
+  const q=state.shuffledQ[state.currentQ];
+  document.getElementById('question-category').textContent=q.c.toUpperCase();
+  document.getElementById('question-text').textContent=q.q;
+  document.getElementById('q-counter').textContent=`${state.currentQ+1}/${state.totalQ}`;
+  const correctText=q.o[q.a]; const opts=shuffle([...q.o]); const ci=opts.indexOf(correctText);
+  ['ans-0','ans-1'].forEach((id,i)=>{
+    const btn=document.getElementById(id);
+    btn.textContent=opts[i];btn.className='ans-btn';btn.disabled=false;btn.dataset.correct=(i===ci)?'true':'false';
+  });
+  state.answered=false;
+  document.getElementById('obstacle-warning').classList.remove('show'); warningShown=false;
+  startTimer();
+}
+
+function startTimer(){
+  const s=DIFF[state.difficulty];
+  const total=Math.max(s.minTime,state.startTime-(state.speedLevel-1));
+  state.timeLeft=total; obstacleJumpQueued=false;
+  clearInterval(state.timerInterval); updateTimerDisplay(total,total); spawnObstacle(total);
+  let elapsed=0;
+  state.timerInterval=setInterval(()=>{
+    elapsed+=0.1; state.timeLeft=total-elapsed;
+    if(state.timeLeft<=0){state.timeLeft=0;updateTimerDisplay(0,total);clearInterval(state.timerInterval);if(!state.answered)timeOut();}
+    else updateTimerDisplay(state.timeLeft,total);
+  },100);
+}
+
+function updateTimerDisplay(rem,total){
+  const pct=rem/total, circ=2*Math.PI*22;
+  document.getElementById('timer-circle').style.strokeDasharray=circ;
+  document.getElementById('timer-circle').style.strokeDashoffset=circ*(1-pct);
+  document.getElementById('timer-text').textContent=Math.ceil(rem);
+  let col='#00FFFF'; if(pct<0.4) col='#FFD700'; if(pct<0.2) col='#FF006E';
+  document.getElementById('timer-circle').style.stroke=col;
+  document.getElementById('timer-text').style.color=col;
+}
+
+function checkSpeedUp(){
+  const s=DIFF[state.difficulty];
+  if(state.questionsThisLevel>=s.stepQ&&state.startTime>s.minTime){
+    state.questionsThisLevel=0;
+    state.startTime=Math.max(s.minTime,state.startTime-1);
+    state.speedLevel++;
+    updateSpeedPips();
+    showLevelUp(state.speedLevel,state.startTime);
+  }
+}
+
+function answer(btnIdx){
+  if(state.answered) return;
+  state.answered=true; clearInterval(state.timerInterval);
+  const btn=document.getElementById(`ans-${btnIdx}`);
+  const isCorrect=btn.dataset.correct==='true';
+  const q=state.shuffledQ[state.currentQ];
+  const cb=document.getElementById('ans-0').dataset.correct==='true'?document.getElementById('ans-0'):document.getElementById('ans-1');
+  document.querySelectorAll('.ans-btn').forEach(b=>b.disabled=true);
+  state.reviewLog.push({correct:isCorrect,q:q.q,correctAnswer:cb.textContent});
+  const flash=document.getElementById('feedback-flash');
+  if(isCorrect){
+    btn.classList.add('correct');
+    state.streak++;state.bestStreak=Math.max(state.bestStreak,state.streak);
+    const bonus=state.streak>=3?2:1;
+    const pts=100*bonus*state.speedLevel;
+    state.score+=pts; document.getElementById('score-display').textContent=state.score;
+    flash.className='correct';
+    emitParticles(runnerX+30,runnerY-40,'57,255,20',10);
+    showScorePopup(`+${pts}${bonus>1?' 🔥':''}`);
+    obstacleJumpQueued=true;
+    if(currentObstacle) currentObstacle.safePass=true;
+    if(currentObstacle&&currentObstacle.x-runnerX<160) triggerJump();
+  } else {
+    btn.classList.add('wrong');cb.classList.add('correct');
+    state.streak=0;flash.className='wrong';
+    if(!currentObstacle||currentObstacle.passed||currentObstacle.collided){handleCrash();if(!state.gameActive)return;}
+  }
+  setTimeout(()=>{flash.className='';},400);
+  state.currentQ++;state.questionsThisLevel++;
+  checkSpeedUp();
+  setTimeout(loadQuestion,1200);
+}
+
+function timeOut(){
+  if(state.answered) return;
+  state.answered=true;state.streak=0;
+  const cb=document.getElementById('ans-0').dataset.correct==='true'?document.getElementById('ans-0'):document.getElementById('ans-1');
+  cb.classList.add('correct');document.querySelectorAll('.ans-btn').forEach(b=>b.disabled=true);
+  const q=state.shuffledQ[state.currentQ];
+  state.reviewLog.push({correct:false,q:q.q,correctAnswer:cb.textContent});
+  const flash=document.getElementById('feedback-flash');flash.className='wrong';
+  setTimeout(()=>{flash.className='';},400);
+  if(!currentObstacle||currentObstacle.passed||currentObstacle.collided){handleCrash();if(!state.gameActive)return;}
+  state.currentQ++;state.questionsThisLevel++;
+  checkSpeedUp();setTimeout(loadQuestion,1200);
+}
+
+function showScorePopup(text){
+  const area=document.getElementById('canvas-area');
+  const el=document.createElement('div');el.className='score-popup';el.textContent=text;
+  el.style.color='#39FF14';el.style.textShadow='0 0 10px #39FF14';
+  el.style.left=(runnerX+30)+'px';el.style.top=(runnerY-50)+'px';
+  area.appendChild(el);setTimeout(()=>el.remove(),1000);
+}
+function updateSpeedPips(){ document.querySelectorAll('.speed-pip').forEach((p,i)=>p.classList.toggle('active',i<state.speedLevel)); }
+function updateLives(){ const d={3:'♥♥♥',2:'♥♥♡',1:'♥♡♡',0:'♡♡♡'}; document.getElementById('lives-display').textContent=d[state.lives]||'♡♡♡'; }
+
+function endGame(won){
+  state.gameActive=false;clearInterval(state.timerInterval);cancelAnimationFrame(animFrameId);
+  document.getElementById('obstacle-warning').classList.remove('show');
+  const title=document.getElementById('result-title'),subtitle=document.getElementById('result-subtitle');
+  if(won){title.textContent='🎵 YOU WIN!';title.className='result-title win';subtitle.textContent='You survived all questions. Maestro!';}
+  else{title.textContent='GAME OVER';title.className='result-title lose';subtitle.textContent=`Reached question ${state.currentQ} of ${state.totalQ}`;}
+  document.getElementById('res-score').textContent=state.score;
+  document.getElementById('res-correct').textContent=state.reviewLog.filter(r=>r.correct).length;
+  document.getElementById('res-streak').textContent=state.bestStreak;
+  document.getElementById('res-level').textContent=state.speedLevel;
+  const list=document.getElementById('review-list');list.innerHTML='';
+  state.reviewLog.forEach(r=>{
+    const div=document.createElement('div');div.className='review-item';
+    div.innerHTML=`<span>${r.skipped?'⏭':r.correct?'✅':'❌'}</span><span class="review-q">${r.q}</span><span class="review-a">${r.correct||r.skipped?'':'→ '+r.correctAnswer}</span>`;
+    list.appendChild(div);
+  });
+  // Save score with name prompt
+  setTimeout(()=>{
+    const name=(prompt(`Score: ${state.score.toLocaleString()}\nEnter your name:`)||'Anonymous').slice(0,16);
+    saveScore({name,score:state.score,diff:state.difficulty,level:state.speedLevel,date:Date.now()});
+    showScreen('result-screen');
+  },300);
+}
+</script>
+</body>
+</html>
